@@ -1,3 +1,5 @@
+using RouteWatch.Core;
+using RouteWatch.Desktop;
 using System.Net;
 using Xunit;
 
@@ -127,8 +129,120 @@ public sealed class ShipmentTests
     private static void AssertUniqueIdentities(IEnumerable<StoredRow> rows) =>
         Assert.Equal(rows.Count(),
             rows.Select(r => (r.BranchCode, r.TrackingNumber)).Distinct().Count());
-    [Fact(Skip = "Implement TC-05")] public void TC05() { }
-    [Fact(Skip = "Implement TC-06")] public void TC06() { }
-    [Fact(Skip = "Implement TC-07")] public void TC07() { }
+    [Fact]
+    public async Task TC05_BranchQueriesReturnOnlyTheSelectedBranch()
+    {
+        await using var env = new TestEnvironment();
+        await env.RefreshWithAsync("branch-001.json", "BR-001");
+        await env.RefreshWithAsync("branch-002.json", "BR-002");   // also contains TRACK-01
+
+        Assert.Equal(3, (await env.SnapshotAsync()).Count);        // same tracking number, no collision
+
+        var br1 = await env.Service.GetBranchAsync("BR-001");
+        var br2 = await env.Service.GetBranchAsync("BR-002");
+
+        Assert.Equal(new[] { "TRACK-01", "TRACK-02" }, br1.Select(s => s.TrackingNumber));
+        Assert.All(br1, s => Assert.Equal("BR-001", s.BranchCode));
+        var br1Track01 = br1.Single(s => s.TrackingNumber == "TRACK-01");
+        Assert.Equal("Cagayan de Oro", br1Track01.Origin);
+        Assert.Equal("Pending", br1Track01.Status);
+
+        var only = Assert.Single(br2);
+        Assert.Equal(("BR-002", "TRACK-01", "Davao", "Delivered"),
+                     (only.BranchCode, only.TrackingNumber, only.Origin, only.Status));
+
+        // Summaries and filters use only that branch's records.
+        Assert.Equal(new ShipmentSummary(2, 1, 1, 0, 0), ShipmentReports.Summarize(br1));
+        Assert.Equal(new ShipmentSummary(1, 0, 0, 1, 0), ShipmentReports.Summarize(br2));
+        Assert.Equal(new[] { "TRACK-02" },
+                     ShipmentReports.Filter(br1, "InTransit").Select(s => s.TrackingNumber));
+        Assert.Empty(ShipmentReports.Filter(br2, "InTransit"));
+    }
+
+    [Fact]
+    public async Task TC06_FilterChangesDisplayedRowsButNotTheBranchSummary()
+    {
+        await using var env = new TestEnvironment();
+        await env.RefreshWithAsync("branch-001.json", "BR-001");
+        var vm = new MainViewModel(env.Service) { BranchCode = "BR-001" };
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        AssertSummary(vm, total: 2, pending: 1, inTransit: 1, delivered: 0, exception: 0);
+        Assert.Equal(new[] { "TRACK-01", "TRACK-02" }, vm.VisibleShipments.Select(s => s.TrackingNumber));
+
+        vm.SelectedStatus = "InTransit";
+        Assert.Equal(new[] { "TRACK-02" }, vm.VisibleShipments.Select(s => s.TrackingNumber));
+        Assert.Equal(1, vm.VisibleCount);
+        AssertSummary(vm, total: 2, pending: 1, inTransit: 1, delivered: 0, exception: 0); // unchanged
+
+        vm.SelectedStatus = "All";
+        Assert.Equal(2, vm.VisibleShipments.Count);
+        AssertSummary(vm, total: 2, pending: 1, inTransit: 1, delivered: 0, exception: 0);
+    }
+
+    [Fact]
+    public async Task TC06_SummaryCountsEveryStatus_ForADifferentCollection()
+    {
+        await using var env = new TestEnvironment();
+        await env.RefreshWithAsync("branch-001.json", "BR-001");
+        await env.RefreshWithAsync("branch-001-update.json", "BR-001");  // now Delivered, InTransit, Exception
+        var vm = new MainViewModel(env.Service) { BranchCode = "BR-001" };
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        AssertSummary(vm, total: 3, pending: 0, inTransit: 1, delivered: 1, exception: 1);
+        vm.SelectedStatus = "Exception";
+        Assert.Equal(new[] { "TRACK-03" }, vm.VisibleShipments.Select(s => s.TrackingNumber));
+        AssertSummary(vm, total: 3, pending: 0, inTransit: 1, delivered: 1, exception: 1);
+    }
+
+    private static void AssertSummary(MainViewModel vm, int total, int pending, int inTransit, int delivered, int exception) =>
+        Assert.Equal((total, pending, inTransit, delivered, exception),
+            (vm.TotalCount, vm.PendingCount, vm.InTransitCount, vm.DeliveredCount, vm.ExceptionCount));
+
+    [Fact]
+    public async Task TC07_ExportWritesExactlyTheDisplayedRows_WithCorrectEscaping()
+    {
+        await using var env = new TestEnvironment();
+        await env.RefreshWithAsync("branch-001.json", "BR-001");   // TRACK-02 has a comma and quotes
+        var vm = new MainViewModel(env.Service) { BranchCode = "BR-001" };
+        await vm.LoadCommand.ExecuteAsync(null);
+        vm.SelectedStatus = "InTransit";                           // displayed subset = TRACK-02 only
+
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".csv");
+        try
+        {
+            vm.ChooseExportFileAsync = _ => Task.FromResult<string?>(path);
+            await vm.ExportCommand.ExecuteAsync(null);
+
+            var rows = TestHelpers.ParseCsv(await File.ReadAllTextAsync(path));
+            Assert.Equal(2, rows.Count);                           // header + exactly one row
+            Assert.Equal(new[] { "TrackingNumber", "Origin", "Destination", "Status", "LastUpdatedUtc" }, rows[0]);
+            Assert.Equal(new[] { "TRACK-02", "Depot, North", "Dock \"A\"", "InTransit" }, rows[1].Take(4));
+            Assert.Equal(TestHelpers.Utc(2026, 11, 10, 9, 15),
+                DateTimeOffset.Parse(rows[1][4], System.Globalization.CultureInfo.InvariantCulture));
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Fact]
+    public void TC07_CommasQuotesAndNewlinesInAField_RoundTripThroughCsv()
+    {
+        var s = new Shipment
+        {
+            TrackingNumber = "TRACK-X",
+            BranchCode = "BR-001",
+            Origin = "Line one\nLine two",
+            Destination = "He said \"hi\", then left",
+            Status = "Pending",
+            LastUpdatedUtc = TestHelpers.Utc(2026, 11, 10, 8, 30)
+        };
+
+        var rows = TestHelpers.ParseCsv(ShipmentReports.Csv(new[] { s }));
+
+        Assert.Equal(2, rows.Count);
+        Assert.Equal(5, rows[1].Count);                            // the newline/comma did not split fields
+        Assert.Equal(new[] { "TRACK-X", "Line one\nLine two", "He said \"hi\", then left", "Pending" },
+                     rows[1].Take(4));
+    }
     [Fact(Skip = "Implement TC-08")] public void TC08() { }
 }

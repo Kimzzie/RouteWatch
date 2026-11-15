@@ -22,6 +22,7 @@ public sealed class ShipmentService(HttpClient http, DbContextOptions<ShipmentDb
         if (!ShipmentRules.ValidBranch(branch)) throw new ArgumentException("Enter a branch such as BR-001.");
         await using var db = new ShipmentDb(database);
         return await db.Shipments.AsNoTracking()
+            .Where(x => x.BranchCode == branch)
             .OrderBy(x => x.TrackingNumber).ToListAsync(cancellationToken);
     }
 

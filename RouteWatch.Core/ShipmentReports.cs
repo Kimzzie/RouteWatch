@@ -13,11 +13,14 @@ public static class ShipmentReports
     public static ShipmentSummary Summarize(IEnumerable<Shipment> branchShipments)
     {
         var all = branchShipments.ToList();
-        return new(all.Count, all.Count(s => s.Status == "Pending"), all.Count(s => s.Status == "Delivered"),
-            all.Count(s => s.Status == "Delivered"), all.Count(s => s.Status == "Exception"));
+        return new(all.Count, all.Count(s => s.Status == "Pending"), all.Count(s => s.Status == "InTransit"),
+           all.Count(s => s.Status == "Delivered"), all.Count(s => s.Status == "Exception"));
     }
 
-    private static string Escape(string value) => value;
+    private static string Escape(string value) =>
+    value.IndexOfAny([',', '"', '\r', '\n']) >= 0
+        ? "\"" + value.Replace("\"", "\"\"") + "\""
+        : value;
 
     public static string Csv(IEnumerable<Shipment> displayed)
     {

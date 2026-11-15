@@ -38,4 +38,32 @@ public static class TestHelpers
                                        s.Destination, s.Status, s.LastUpdatedUtc))
             .ToListAsync();
     }
+    // Minimal RFC 4180 parser: handles quoted fields, "" escapes, and newlines inside quotes.
+    public static List<List<string>> ParseCsv(string text)
+    {
+        var rows = new List<List<string>>();
+        var row = new List<string>();
+        var field = new System.Text.StringBuilder();
+        var inQuotes = false;
+        for (var i = 0; i < text.Length; i++)
+        {
+            var c = text[i];
+            if (inQuotes)
+            {
+                if (c == '"')
+                {
+                    if (i + 1 < text.Length && text[i + 1] == '"') { field.Append('"'); i++; }
+                    else inQuotes = false;
+                }
+                else field.Append(c);
+            }
+            else if (c == '"') inQuotes = true;
+            else if (c == ',') { row.Add(field.ToString()); field.Clear(); }
+            else if (c == '\r') { }
+            else if (c == '\n') { row.Add(field.ToString()); field.Clear(); rows.Add(row); row = new(); }
+            else field.Append(c);
+        }
+        if (field.Length > 0 || row.Count > 0) { row.Add(field.ToString()); rows.Add(row); }
+        return rows;
+    }
 }
