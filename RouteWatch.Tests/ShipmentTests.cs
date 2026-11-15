@@ -58,8 +58,75 @@ public sealed class ShipmentTests
 
         Assert.Equal(before, await env.SnapshotAsync());           // identical, field by field
     }
-    [Fact(Skip = "Implement TC-03")] public void TC03() { }
-    [Fact(Skip = "Implement TC-04")] public void TC04() { }
+    [Fact]
+    public async Task TC03_InvalidJson_ReportsInvalidDataAndKeepsSavedRecords()
+    {
+        await using var env = new TestEnvironment();
+        await env.RefreshWithAsync("branch-001.json", "BR-001");   // precondition: valid saved data
+        var before = await env.SnapshotAsync();
+        Assert.Equal(2, before.Count);
+
+        env.Handler.Status = HttpStatusCode.OK;                    // HTTP is fine, the body is broken
+        env.Handler.Body = TestEnvironment.Fixture("invalid.json");
+
+        await Assert.ThrowsAsync<InvalidDataException>(
+            () => env.Service.RefreshAsync(TestHelpers.BaseUrl, "BR-001"));
+
+        Assert.Equal(before, await env.SnapshotAsync());
+    }
+
+    [Fact]
+    public async Task TC03_ValidJsonButMissingFields_IsRejectedAndKeepsSavedRecords()
+    {
+        await using var env = new TestEnvironment();
+        await env.RefreshWithAsync("branch-001.json", "BR-001");
+        var before = await env.SnapshotAsync();
+
+        env.Handler.Status = HttpStatusCode.OK;
+        env.Handler.Body = """{"branchCode":"BR-001","shipments":[{"trackingNumber":"TRACK-09"}]}""";
+
+        await Assert.ThrowsAsync<InvalidDataException>(
+            () => env.Service.RefreshAsync(TestHelpers.BaseUrl, "BR-001"));
+
+        Assert.Equal(before, await env.SnapshotAsync());
+    }
+
+    [Fact]
+    public async Task TC04_RepeatedAndUpdatedRefresh_IsIdempotentAndNeverDeletes()
+    {
+        await using var env = new TestEnvironment();
+
+        // 1) Same response twice -> no duplicates.
+        await env.RefreshWithAsync("branch-001.json", "BR-001");
+        await env.RefreshWithAsync("branch-001.json", "BR-001");
+        var afterRepeat = await env.SnapshotAsync();
+        Assert.Equal(2, afterRepeat.Count);
+        AssertUniqueIdentities(afterRepeat);
+        var track02Before = afterRepeat.Single(r => r.TrackingNumber == "TRACK-02");
+
+        // 2) Update: TRACK-01 changes, TRACK-03 is new, TRACK-02 is omitted but must stay.
+        await env.RefreshWithAsync("branch-001-update.json", "BR-001");
+        var afterUpdate = await env.SnapshotAsync();
+        Assert.Equal(3, afterUpdate.Count);
+        AssertUniqueIdentities(afterUpdate);
+        Assert.Equal(
+            new StoredRow("BR-001", "TRACK-01", "Cagayan de Oro", "Valencia", "Delivered",
+                          TestHelpers.Utc(2026, 11, 12, 10, 0)),
+            afterUpdate.Single(r => r.TrackingNumber == "TRACK-01"));
+        Assert.Equal(
+            new StoredRow("BR-001", "TRACK-03", "Iligan", "Butuan", "Exception",
+                          TestHelpers.Utc(2026, 11, 12, 11, 0)),
+            afterUpdate.Single(r => r.TrackingNumber == "TRACK-03"));
+        Assert.Equal(track02Before, afterUpdate.Single(r => r.TrackingNumber == "TRACK-02"));
+
+        // 3) Empty response -> deletes nothing.
+        await env.RefreshWithAsync("empty-001.json", "BR-001");
+        Assert.Equal(afterUpdate, await env.SnapshotAsync());
+    }
+
+    private static void AssertUniqueIdentities(IEnumerable<StoredRow> rows) =>
+        Assert.Equal(rows.Count(),
+            rows.Select(r => (r.BranchCode, r.TrackingNumber)).Distinct().Count());
     [Fact(Skip = "Implement TC-05")] public void TC05() { }
     [Fact(Skip = "Implement TC-06")] public void TC06() { }
     [Fact(Skip = "Implement TC-07")] public void TC07() { }

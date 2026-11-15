@@ -10,5 +10,6 @@ public sealed class ShipmentDb(DbContextOptions<ShipmentDb> options) : DbContext
         builder.Entity<Shipment>().HasIndex(s => new { s.BranchCode, s.TrackingNumber });
         builder.Entity<Shipment>().Property(s => s.BranchCode).IsRequired();
         builder.Entity<Shipment>().Property(s => s.TrackingNumber).IsRequired();
+        builder.Entity<Shipment>().HasIndex(s => new { s.BranchCode, s.TrackingNumber }).IsUnique();
     }
 }

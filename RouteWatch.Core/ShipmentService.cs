@@ -37,7 +37,7 @@ public sealed class ShipmentService(HttpClient http, DbContextOptions<ShipmentDb
         response.EnsureSuccessStatusCode();   // non-2xx → HttpRequestException, so nothing is parsed or saved
         ApiResponse? payload;
         try { payload = await response.Content.ReadFromJsonAsync<ApiResponse>(cancellationToken); }
-        catch (JsonException) { return 0; }
+        catch (JsonException ex) { throw new InvalidDataException("The service returned invalid JSON.", ex); }
         if (payload?.BranchCode != branch || payload.Shipments is null)
             throw new InvalidDataException("The response does not match the requested branch.");
         var unique = new HashSet<string>(StringComparer.Ordinal);
@@ -51,11 +51,20 @@ public sealed class ShipmentService(HttpClient http, DbContextOptions<ShipmentDb
         }
         await using var db = new ShipmentDb(database);
         await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
+
+        // Load this branch's existing rows once, keyed by tracking number.
+        var existing = await db.Shipments
+            .Where(s => s.BranchCode == branch)
+            .ToDictionaryAsync(s => s.TrackingNumber, StringComparer.Ordinal, cancellationToken);
+
         foreach (var item in payload.Shipments)
         {
-            var saved = new Shipment { BranchCode = branch, TrackingNumber = item.TrackingNumber! };
-            db.Shipments.Add(saved);
-            saved.Origin = item.Origin!; saved.Destination = item.Destination!;
+            if (!existing.TryGetValue(item.TrackingNumber!, out var saved))
+            {
+                saved = new Shipment { BranchCode = branch, TrackingNumber = item.TrackingNumber! };
+                db.Shipments.Add(saved);                       // new shipment -> insert
+            }
+            saved.Origin = item.Origin!; saved.Destination = item.Destination!;   // existing -> update in place
             saved.Status = item.Status!; saved.LastUpdatedUtc = item.LastUpdatedUtc!.Value;
         }
         await db.SaveChangesAsync(cancellationToken);
