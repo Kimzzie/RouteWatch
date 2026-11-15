@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using RouteWatch.Core;
 using RouteWatch.Desktop;
 using System.Net;
@@ -244,5 +245,48 @@ public sealed class ShipmentTests
         Assert.Equal(new[] { "TRACK-X", "Line one\nLine two", "He said \"hi\", then left", "Pending" },
                      rows[1].Take(4));
     }
-    [Fact(Skip = "Implement TC-08")] public void TC08() { }
+
+    [Fact]
+    public async Task TC08_SavedRecordsSurviveDisposingAndReopeningTheDatabase()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "routewatch-tc08-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var connection = $"Data Source={Path.Combine(dir, "shipments.db")};Pooling=False";
+        try
+        {
+            // Session 1: save a valid response, then dispose everything.
+            {
+                var handler = new FakeHttpHandler { Body = TestEnvironment.Fixture("branch-001.json") };
+                using var client = new HttpClient(handler);
+                var options1 = new DbContextOptionsBuilder<ShipmentDb>().UseSqlite(connection).Options;
+                var service1 = new ShipmentService(client, options1);
+                await service1.InitializeAsync();
+                Assert.Equal(2, await service1.RefreshAsync(TestHelpers.BaseUrl, "BR-001"));
+            }
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+
+            // Session 2: brand-new options, service and HttpClient; no network at all.
+            var options2 = new DbContextOptionsBuilder<ShipmentDb>().UseSqlite(connection).Options;
+            var service2 = new ShipmentService(new HttpClient(new FakeHttpHandler()), options2);
+            await service2.InitializeAsync();             // must not wipe existing data
+            var rows = await service2.GetBranchAsync("BR-001");
+
+            Assert.Collection(rows,
+                r => {
+                    Assert.Equal("TRACK-01", r.TrackingNumber); Assert.Equal("Cagayan de Oro", r.Origin);
+                    Assert.Equal("Valencia", r.Destination); Assert.Equal("Pending", r.Status);
+                    Assert.Equal(TestHelpers.Utc(2026, 11, 10, 8, 30), r.LastUpdatedUtc);
+                },
+                r => {
+                    Assert.Equal("TRACK-02", r.TrackingNumber); Assert.Equal("Depot, North", r.Origin);
+                    Assert.Equal("Dock \"A\"", r.Destination); Assert.Equal("InTransit", r.Status);
+                    Assert.Equal(TestHelpers.Utc(2026, 11, 10, 9, 15), r.LastUpdatedUtc);
+                });
+        }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            if (Directory.Exists(dir)) Directory.Delete(dir, true);
+        }
+    }
 }
