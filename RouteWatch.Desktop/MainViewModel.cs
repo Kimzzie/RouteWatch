@@ -32,6 +32,16 @@ public partial class MainViewModel : ObservableObject
     public IAsyncRelayCommand ExportCommand { get; }
     public Func<string, Task<string?>>? ChooseExportFileAsync { get; set; }
 
+    // A problem found at startup (e.g. unreadable appsettings.json), shown with the first load.
+    public string? StartupNotice { get; set; }
+
+    private string WithStartupNotice(string text)
+    {
+        var notice = StartupNotice;
+        StartupNotice = null;                    // shown once, together with the first load
+        return notice is null ? text : $"{notice} {text}";
+    }
+
     public MainViewModel(ShipmentService service)
     {
         _service = service;
@@ -62,8 +72,8 @@ public partial class MainViewModel : ObservableObject
     private async Task LoadAsync()
     {
         IsBusy = true;
-        try { var branch = BranchCode; await LoadStoredAsync(branch); Message = $"Showing saved records for {branch}."; }
-        catch (Exception e) { Message = $"Could not load saved records: {e.Message}"; }
+        try { var branch = BranchCode; await LoadStoredAsync(branch); Message = WithStartupNotice($"Showing saved records for {branch}."); }
+        catch (Exception e) { Message = WithStartupNotice($"Could not load saved records: {e.Message}"); }
         finally { IsBusy = false; }
     }
     private async Task RefreshAsync()

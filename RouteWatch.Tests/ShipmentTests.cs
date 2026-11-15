@@ -289,4 +289,18 @@ public sealed class ShipmentTests
             if (Directory.Exists(dir)) Directory.Delete(dir, true);
         }
     }
+
+    [Fact]
+    public async Task Ui_StartupConfigurationWarning_SurvivesTheInitialLoad()
+    {
+        await using var env = new TestEnvironment();
+        var vm = new MainViewModel(env.Service)
+        { BranchCode = "BR-001", StartupNotice = "Configuration could not be read." };
+
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        Assert.Contains("Configuration could not be read.", vm.Message);
+    }
+
+
 }

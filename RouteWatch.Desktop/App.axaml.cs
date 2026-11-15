@@ -35,7 +35,7 @@ public sealed partial class App : Application
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidDataException)
             {
-                vm.Message = "Configuration could not be read. Enter a service URL and branch: " + ex.Message;
+                vm.StartupNotice = "Configuration could not be read. Enter a service URL and branch: " + ex.Message;
             }
             desktop.MainWindow = new MainWindow { DataContext = vm };
             desktop.Exit += (_, _) => _services.Dispose();
