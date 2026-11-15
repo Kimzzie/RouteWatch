@@ -34,6 +34,7 @@ public sealed class ShipmentService(HttpClient http, DbContextOptions<ShipmentDb
         var path = useDelayTestEndpoint ? "/api/test/shipments?branchCode=" : "/api/shipments?branchCode=";
         var uri = new Uri(root, path + Uri.EscapeDataString(branch) + (useDelayTestEndpoint ? "&mode=delay" : ""));
         using var response = await http.GetAsync(uri, cancellationToken);
+        response.EnsureSuccessStatusCode();   // non-2xx → HttpRequestException, so nothing is parsed or saved
         ApiResponse? payload;
         try { payload = await response.Content.ReadFromJsonAsync<ApiResponse>(cancellationToken); }
         catch (JsonException) { return 0; }
