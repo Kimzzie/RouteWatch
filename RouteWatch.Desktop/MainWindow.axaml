@@ -1,0 +1,76 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="RouteWatch.Desktop.MainWindow" Title="RouteWatch" Width="1200" Height="800"
+        MinWidth="920" MinHeight="680" Background="#F2F5F9" FontFamily="Inter, Segoe UI, sans-serif">
+  <Window.Styles>
+    <Style Selector="TextBlock.section-label"><Setter Property="FontSize" Value="11"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Foreground" Value="#62748A"/></Style>
+    <Style Selector="TextBlock.metric-value"><Setter Property="FontSize" Value="27"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="Foreground" Value="#142C46"/></Style>
+    <Style Selector="Border.card"><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#DFE7F0"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="9"/></Style>
+    <Style Selector="Button.action"><Setter Property="Padding" Value="17,10"/><Setter Property="CornerRadius" Value="6"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+    <Style Selector="Button.primary"><Setter Property="Background" Value="#176B72"/><Setter Property="Foreground" Value="White"/></Style>
+    <Style Selector="Button.primary:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="#10565D"/><Setter Property="Foreground" Value="White"/></Style>
+    <Style Selector="DataGridColumnHeader"><Setter Property="Background" Value="#EDF2F7"/><Setter Property="Foreground" Value="#52657A"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="FontSize" Value="12"/></Style>
+  </Window.Styles>
+  <Grid RowDefinitions="Auto,*">
+    <Border Background="#142C46" Padding="28,20">
+      <Grid ColumnDefinitions="*,Auto">
+        <StackPanel Spacing="3">
+          <TextBlock Text="ROUTEWATCH" Foreground="#82D5CB" FontSize="11" FontWeight="Bold"/>
+          <TextBlock Text="Shipment operations" Foreground="White" FontSize="25" FontWeight="Bold"/>
+          <TextBlock Text="Monitor your branch and keep local records up to date." Foreground="#B9C9D8" FontSize="13"/>
+        </StackPanel>
+        <Border Grid.Column="1" Background="#233F59" CornerRadius="6" Padding="12,7" VerticalAlignment="Center">
+          <TextBlock Text="DESKTOP WORKSPACE" Foreground="#C9D9E7" FontSize="10" FontWeight="SemiBold"/>
+        </Border>
+      </Grid>
+    </Border>
+    <Grid Grid.Row="1" RowDefinitions="Auto,Auto,Auto,*,Auto" Margin="28,20,28,16">
+      <Border Classes="card" Padding="18,15" Margin="0,0,0,12">
+        <Grid ColumnDefinitions="*,145,Auto,Auto">
+          <StackPanel Margin="0,0,12,0" Spacing="6"><TextBlock Classes="section-label" Text="SERVICE ADDRESS"/><TextBox Text="{Binding BaseAddress}" Watermark="http://127.0.0.1:5080"/></StackPanel>
+          <StackPanel Grid.Column="1" Margin="0,0,12,0" Spacing="6"><TextBlock Classes="section-label" Text="BRANCH CODE"/><TextBox Text="{Binding BranchCode}" Watermark="BR-001"/></StackPanel>
+          <Button Grid.Column="2" Classes="action" Content="Load saved" Command="{Binding LoadCommand}" VerticalAlignment="Bottom" Margin="0,0,8,0"/>
+          <Button Grid.Column="3" Classes="action primary" Content="Refresh from service" Command="{Binding RefreshCommand}" VerticalAlignment="Bottom"/>
+        </Grid>
+      </Border>
+      <Border Grid.Row="1" Background="#E8F3F3" BorderBrush="#CBE4E2" BorderThickness="1" CornerRadius="7" Padding="14,10" Margin="0,0,0,16">
+        <Grid ColumnDefinitions="Auto,*,Auto"><TextBlock Text="STATUS" FontSize="10" FontWeight="Bold" Foreground="#176B72" VerticalAlignment="Center" Margin="0,0,12,0"/><TextBlock Grid.Column="1" Text="{Binding Message}" Foreground="#244E56" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0"/><CheckBox Grid.Column="2" Content="Use delay test (MA-01)" IsChecked="{Binding UseDelayTestEndpoint}" IsEnabled="{Binding !IsBusy}" VerticalAlignment="Center"/></Grid>
+      </Border>
+      <StackPanel Grid.Row="2" Spacing="10" Margin="0,0,0,18">
+        <Grid ColumnDefinitions="*,Auto"><StackPanel Spacing="3"><TextBlock Text="Branch overview" FontSize="17" FontWeight="Bold" Foreground="#142C46"/><TextBlock Text="Counts include all saved shipments for the loaded branch." Foreground="#697C90" FontSize="12"/></StackPanel><TextBlock Grid.Column="1" Text="{Binding LoadedBranchLabel}" Foreground="#536B80" FontSize="12" VerticalAlignment="Center"/></Grid>
+        <Grid ColumnDefinitions="*,*,*,*,*">
+          <Border Classes="card" Padding="14,11" Margin="0,0,8,0"><StackPanel Spacing="3"><TextBlock Classes="section-label" Text="TOTAL SAVED"/><TextBlock Classes="metric-value" Text="{Binding TotalCount}"/></StackPanel></Border>
+          <Border Grid.Column="1" Classes="card" Padding="14,11" Margin="0,0,8,0"><StackPanel Spacing="3"><TextBlock Classes="section-label" Text="PENDING"/><TextBlock Classes="metric-value" Text="{Binding PendingCount}"/></StackPanel></Border>
+          <Border Grid.Column="2" Classes="card" Padding="14,11" Margin="0,0,8,0"><StackPanel Spacing="3"><TextBlock Classes="section-label" Text="IN TRANSIT"/><TextBlock Classes="metric-value" Text="{Binding InTransitCount}"/></StackPanel></Border>
+          <Border Grid.Column="3" Classes="card" Padding="14,11" Margin="0,0,8,0"><StackPanel Spacing="3"><TextBlock Classes="section-label" Text="DELIVERED"/><TextBlock Classes="metric-value" Text="{Binding DeliveredCount}"/></StackPanel></Border>
+          <Border Grid.Column="4" Classes="card" Padding="14,11"><StackPanel Spacing="3"><TextBlock Classes="section-label" Text="EXCEPTION"/><TextBlock Classes="metric-value" Text="{Binding ExceptionCount}"/></StackPanel></Border>
+        </Grid>
+      </StackPanel>
+      <Border Grid.Row="3" Classes="card" ClipToBounds="True">
+        <Grid RowDefinitions="Auto,*">
+          <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="18,15,18,14">
+            <StackPanel Spacing="3"><TextBlock Text="Shipments" FontSize="17" FontWeight="Bold" Foreground="#142C46"/><StackPanel Orientation="Horizontal" Spacing="4"><TextBlock Text="Displayed:" FontSize="12" Foreground="#697C90"/><TextBlock Text="{Binding VisibleCount}" FontSize="12" Foreground="#697C90"/></StackPanel></StackPanel>
+            <TextBlock Grid.Column="1" Text="Status" Foreground="#52657A" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <ComboBox Grid.Column="2" ItemsSource="{Binding StatusOptions}" SelectedItem="{Binding SelectedStatus}" Width="145" VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <Button Grid.Column="3" Classes="action" Content="Export CSV" Command="{Binding ExportCommand}" VerticalAlignment="Center"/>
+          </Grid>
+          <Grid Grid.Row="1">
+            <DataGrid ItemsSource="{Binding VisibleShipments}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"
+                      CanUserSortColumns="False" CanUserResizeColumns="True" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#E9EEF4"
+                      RowHeight="42" ColumnHeaderHeight="38" BorderThickness="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                      LoadingRow="OnShipmentRowLoading">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="TRACKING NUMBER" Binding="{Binding TrackingNumber}" Width="170"/>
+                <DataGridTextColumn Header="ORIGIN" Binding="{Binding Origin}" Width="*"/>
+                <DataGridTextColumn Header="DESTINATION" Binding="{Binding Destination}" Width="*"/>
+                <DataGridTextColumn Header="STATUS" Binding="{Binding Status}" Width="135"/>
+                <DataGridTextColumn Header="LAST UPDATED (UTC)" Binding="{Binding LastUpdatedUtc, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss.FFFFFFF}'}" Width="210"/>
+              </DataGrid.Columns>
+            </DataGrid>
+            <TextBlock Text="No shipments to display. Load saved records or refresh from the service." IsVisible="{Binding !HasVisibleShipments}" IsHitTestVisible="False" Foreground="#8292A2" HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" Margin="24"/>
+          </Grid>
+        </Grid>
+      </Border>
+      <Grid Grid.Row="4" ColumnDefinitions="*,Auto" Margin="2,12,2,0"><TextBlock Text="Saved records remain available when the service is offline." Foreground="#718297" FontSize="11"/><TextBlock Grid.Column="1" Text="Working..." IsVisible="{Binding IsBusy}" Foreground="#176B72" FontSize="11" FontWeight="SemiBold"/></Grid>
+    </Grid>
+  </Grid>
+</Window>

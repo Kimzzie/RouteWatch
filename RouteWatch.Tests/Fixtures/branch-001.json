@@ -1,0 +1,1 @@
+{"branchCode":"BR-001","shipments":[{"trackingNumber":"TRACK-01","branchCode":"BR-001","origin":"Cagayan de Oro","destination":"Valencia","status":"Pending","lastUpdatedUtc":"2026-11-10T08:30:00Z"},{"trackingNumber":"TRACK-02","branchCode":"BR-001","origin":"Depot, North","destination":"Dock \"A\"","status":"InTransit","lastUpdatedUtc":"2026-11-10T09:15:00Z"}]}
