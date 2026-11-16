@@ -39,3 +39,6 @@
 
 **Export from the published exe matches the grid.**
 ![Correct export](ma02-csv-export-correct.png)
+
+**Publish folder contents.** Executable, configuration and native libraries are present.
+![Publish folder check](ma02-publish-folder-check.png)
