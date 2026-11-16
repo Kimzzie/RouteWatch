@@ -1,6 +1,6 @@
 # RouteWatch (PT6: verified, repaired and published)
 
-Prepared by: Kimberly Bautista and <partner name> · BSIT-3D
+Prepared by: Kimberly Bautista BSIT-3D
 
 ## Requirements
 Windows x64. The .NET 10 SDK is needed only to build and test; the published app does not need .NET installed.
